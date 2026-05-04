@@ -1,0 +1,43 @@
+{
+  "name": "lingui-translate",
+  "version": "0.1.0",
+  "description": "CLI for translating missing Lingui PO entries with an LLM.",
+  "type": "module",
+  "bin": {
+    "lingui-translate": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "keywords": [
+    "lingui",
+    "i18n",
+    "translation",
+    "openai",
+    "po"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "openai": "^6.35.0",
+    "p-limit": "^7.3.0",
+    "pofile": "^1.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
