@@ -1,32 +1,46 @@
 # lingui-translate
 
-CLI for translating missing Lingui `messages.po` entries with an LLM.
+`lingui-translate` is a small CLI that fills missing Lingui `messages.po` translations with an LLM.
 
-## Install
+Missing translations are easy to leave behind, especially when strings change often or several locales need to stay in sync. This package scans your Lingui locale folders, finds untranslated entries, and writes translations back into the existing `messages.po` files. The result is a faster localization workflow with less repetitive copy/paste and more consistent wording across a locale.
+
+## Quick start
+
+Install it:
 
 ```bash
 npm install --save-dev lingui-translate
 ```
 
-## Usage
+Set an API key:
 
 ```bash
-lingui-translate --locales-dir src/locales --languages de es
+export OPENAI_API_KEY=your_api_key_here
 ```
 
-With `npx`:
+Run it on your locales:
 
 ```bash
 npx lingui-translate --locales-dir src/locales --languages de es
 ```
 
-Dry run:
+That is enough to get started. If your project uses the default `src/locales` layout, you can also keep the command very small by moving options into a config file.
+
+## Usage
+
+Translate specific languages:
+
+```bash
+lingui-translate --locales-dir src/locales --languages de es
+```
+
+Preview changes without writing files:
 
 ```bash
 lingui-translate --locales-dir src/locales --languages de es --dry-run
 ```
 
-With custom model and system prompt:
+Use a custom model and prompt:
 
 ```bash
 lingui-translate \
@@ -38,7 +52,7 @@ lingui-translate \
 
 ## Config
 
-The CLI will auto-load one of:
+The CLI can auto-load:
 
 - `lingui-translate.config.json`
 - `lingui-translate.config.js`
@@ -58,23 +72,13 @@ export default {
 };
 ```
 
-CLI flags override config-file values.
-
-## Lingui pipeline example
-
-Replace the old Python step:
+Then you can run:
 
 ```bash
-python3 scripts/translate/translate_missing.py --locales-dir src/locales --languages de es
+npx lingui-translate
 ```
 
-with:
-
-```bash
-npx lingui-translate --locales-dir src/locales --languages de es
-```
-
-The CLI exits with `2` when translations were written, so an existing extract/translate/compile pipeline can preserve the same "translations changed, commit them first" behavior.
+CLI flags override config file values.
 
 ## Environment
 
