@@ -80,6 +80,18 @@ npx lingui-translate
 
 CLI flags override config file values.
 
+## Defaults
+
+If you do not provide config, flags, or environment variables, `lingui-translate` uses:
+
+- `localesDir`: `src/locales`
+- `dryRun`: `false`
+- `workers`: `4`
+- `model`: `gpt-5.4`
+- `systemPrompt`: `You are a professional translator specializing in software localization. Pay careful attention to the provided examples to maintain consistency in style and terminology.`
+
+There is no default API key or base URL. The API key must be provided through `OPENAI_API_KEY`, `LINGUI_TRANSLATE_API_KEY`, or `--api-key`.
+
 ## Environment
 
 - `OPENAI_API_KEY` or `LINGUI_TRANSLATE_API_KEY`
