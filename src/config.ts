@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { ConfigInput, ResolvedConfig } from "./types.js";
+import type { AiProvider, ConfigInput, ResolvedConfig } from "./types.js";
 
 const DEFAULT_SYSTEM_PROMPT =
   "You are a professional translator specializing in software localization. Pay careful attention to the provided examples to maintain consistency in style and terminology.";
@@ -11,9 +11,15 @@ const DEFAULTS = {
   localesDir: "src/locales",
   dryRun: false,
   workers: 4,
-  model: "gpt-5.4",
+  provider: "openai",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
-} as const;
+} as const satisfies {
+  localesDir: string;
+  dryRun: boolean;
+  workers: number;
+  provider: AiProvider;
+  systemPrompt: string;
+};
 
 const AUTO_CONFIG_NAMES = [
   "lingui-translate.config.json",
@@ -24,6 +30,51 @@ const AUTO_CONFIG_NAMES = [
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isAiProvider(value: string): value is AiProvider {
+  return value === "openai" || value === "anthropic" || value === "google";
+}
+
+function normalizeProvider(value: unknown, source: string): AiProvider {
+  if (typeof value !== "string" || !isAiProvider(value)) {
+    throw new Error(`${source} must be one of: openai, anthropic, google.`);
+  }
+
+  return value;
+}
+
+function getDefaultModel(provider: AiProvider): string {
+  switch (provider) {
+    case "openai":
+      return "gpt-5.4";
+    case "anthropic":
+      return "claude-sonnet-4-6";
+    case "google":
+      return "gemini-2.5-flash";
+  }
+}
+
+function getProviderApiKeyFromEnv(provider: AiProvider): string | undefined {
+  switch (provider) {
+    case "openai":
+      return trimMaybe(process.env.OPENAI_API_KEY);
+    case "anthropic":
+      return trimMaybe(process.env.ANTHROPIC_API_KEY);
+    case "google":
+      return trimMaybe(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  }
+}
+
+function getProviderBaseUrlFromEnv(provider: AiProvider): string | undefined {
+  switch (provider) {
+    case "openai":
+      return trimMaybe(process.env.OPENAI_BASE_URL);
+    case "anthropic":
+      return trimMaybe(process.env.ANTHROPIC_BASE_URL);
+    case "google":
+      return trimMaybe(process.env.GOOGLE_GENERATIVE_AI_BASE_URL);
+  }
 }
 
 function normalizeConfigInput(value: unknown, source: string): ConfigInput {
@@ -60,6 +111,10 @@ function normalizeConfigInput(value: unknown, source: string): ConfigInput {
       throw new Error(`${source}.workers must be a number.`);
     }
     result.workers = input.workers;
+  }
+
+  if (input.provider !== undefined) {
+    result.provider = normalizeProvider(input.provider, `${source}.provider`);
   }
 
   if (input.model !== undefined) {
@@ -158,8 +213,16 @@ export async function resolveConfig(options: ResolveConfigOptions = {}): Promise
   const fileConfig = configPath ? await loadConfigFile(configPath) : {};
   const cliConfig = options.cliConfig ?? {};
   const envWorkers = parsePositiveInteger(trimMaybe(process.env.LINGUI_TRANSLATE_WORKERS));
+  const envProvider = trimMaybe(process.env.LINGUI_TRANSLATE_PROVIDER);
 
   const envLanguages = trimMaybe(process.env.LINGUI_TRANSLATE_LANGUAGES)?.split(",").map((item) => item.trim()).filter(Boolean);
+  const provider = normalizeProvider(
+    cliConfig.provider ??
+      fileConfig.provider ??
+      envProvider ??
+      DEFAULTS.provider,
+    "provider",
+  );
   const resolved: ResolvedConfig = {
     cwd,
     localesDir: path.resolve(
@@ -186,11 +249,12 @@ export async function resolveConfig(options: ResolveConfigOptions = {}): Promise
           DEFAULTS.workers,
       ),
     ),
+    provider,
     model:
       cliConfig.model ??
       fileConfig.model ??
       trimMaybe(process.env.LINGUI_TRANSLATE_MODEL) ??
-      DEFAULTS.model,
+      getDefaultModel(provider),
     systemPrompt:
       cliConfig.systemPrompt ??
       fileConfig.systemPrompt ??
@@ -199,13 +263,13 @@ export async function resolveConfig(options: ResolveConfigOptions = {}): Promise
     apiKey:
       cliConfig.apiKey ??
       fileConfig.apiKey ??
-      trimMaybe(process.env.OPENAI_API_KEY) ??
-      trimMaybe(process.env.LINGUI_TRANSLATE_API_KEY),
+      trimMaybe(process.env.LINGUI_TRANSLATE_API_KEY) ??
+      getProviderApiKeyFromEnv(provider),
     baseUrl:
       cliConfig.baseUrl ??
       fileConfig.baseUrl ??
-      trimMaybe(process.env.OPENAI_BASE_URL) ??
-      trimMaybe(process.env.LINGUI_TRANSLATE_BASE_URL),
+      trimMaybe(process.env.LINGUI_TRANSLATE_BASE_URL) ??
+      getProviderBaseUrlFromEnv(provider),
     configPath,
   };
 

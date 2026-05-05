@@ -1,8 +1,11 @@
+export type AiProvider = "openai" | "anthropic" | "google";
+
 export interface ConfigInput {
   localesDir?: string;
   languages?: string[];
   dryRun?: boolean;
   workers?: number;
+  provider?: AiProvider;
   model?: string;
   systemPrompt?: string;
   apiKey?: string;
@@ -15,6 +18,7 @@ export interface ResolvedConfig {
   languages?: string[];
   dryRun: boolean;
   workers: number;
+  provider: AiProvider;
   model: string;
   systemPrompt: string;
   apiKey?: string;

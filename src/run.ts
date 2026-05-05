@@ -5,15 +5,26 @@ import pLimit from "p-limit";
 
 import { findMissingTranslations, findLanguageDirectories, getCommentText, getLanguageCode, loadPoFile, savePoFile, setItemTranslation } from "./po.js";
 import { getRelevantSampleTranslations } from "./relevance.js";
-import { createOpenAIClient, translateText } from "./translate.js";
+import { translateText } from "./translate.js";
 import type { POItem } from "./po.js";
-import type { LocaleStats, ResolvedConfig, RunStats, TranslationSample } from "./types.js";
+import type { AiProvider, LocaleStats, ResolvedConfig, RunStats, TranslationSample } from "./types.js";
 
 interface WorkItem {
   index: number;
   item: POItem;
   context: string;
   sampleTranslations: TranslationSample[];
+}
+
+function getApiKeyHint(provider: AiProvider): string {
+  switch (provider) {
+    case "openai":
+      return "OPENAI_API_KEY";
+    case "anthropic":
+      return "ANTHROPIC_API_KEY";
+    case "google":
+      return "GOOGLE_GENERATIVE_AI_API_KEY";
+  }
 }
 
 async function ensureLocalesDirExists(localesDir: string): Promise<void> {
@@ -52,12 +63,11 @@ async function translateMissingEntries(
 
   if (!config.apiKey) {
     throw new Error(
-      "OpenAI API key not provided. Set OPENAI_API_KEY, LINGUI_TRANSLATE_API_KEY, or pass --api-key.",
+      `${config.provider} API key not provided. Set ${getApiKeyHint(config.provider)}, LINGUI_TRANSLATE_API_KEY, or pass --api-key.`,
     );
   }
 
   const limit = pLimit(Math.max(1, Math.min(config.workers, workItems.length)));
-  const client = createOpenAIClient(config);
   let translatedCount = 0;
   let completedCount = 0;
 
@@ -73,7 +83,7 @@ async function translateMissingEntries(
         }
 
         try {
-          const translation = await translateText(client, config, {
+          const translation = await translateText(config, {
             text: workItem.item.msgid,
             targetLanguage: languageCode,
             context: workItem.context,
@@ -171,6 +181,8 @@ export async function runTranslation(config: ResolvedConfig): Promise<RunStats> 
 
   console.log("Starting Lingui Translate...");
   console.log(`Locales directory: ${config.localesDir}`);
+  console.log(`Provider: ${config.provider}`);
+  console.log(`Model: ${config.model}`);
   if (config.configPath) {
     console.log(`Config file: ${config.configPath}`);
   }

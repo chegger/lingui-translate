@@ -1,4 +1,8 @@
-import OpenAI from "openai";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
 
 import type { ResolvedConfig, TranslationSample } from "./types.js";
 
@@ -64,15 +68,27 @@ function stripWrappingQuotes(value: string): string {
   return value;
 }
 
-export function createOpenAIClient(config: ResolvedConfig): OpenAI {
-  return new OpenAI({
-    apiKey: config.apiKey,
-    baseURL: config.baseUrl,
-  });
+function getLanguageModel(config: ResolvedConfig): LanguageModelV3 {
+  switch (config.provider) {
+    case "openai":
+      return createOpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
+      })(config.model);
+    case "anthropic":
+      return createAnthropic({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
+      })(config.model);
+    case "google":
+      return createGoogleGenerativeAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
+      })(config.model);
+  }
 }
 
 export async function translateText(
-  client: OpenAI,
   config: ResolvedConfig,
   params: {
     text: string;
@@ -82,13 +98,13 @@ export async function translateText(
   },
 ): Promise<string> {
   const prompt = buildTranslationPrompt(params);
-  const response = await client.responses.create({
-    model: config.model,
-    instructions: config.systemPrompt,
-    input: prompt,
-    max_output_tokens: 1000,
+  const response = await generateText({
+    model: getLanguageModel(config),
+    system: config.systemPrompt,
+    prompt,
+    maxOutputTokens: 1000,
     temperature: 0.3,
   });
 
-  return stripWrappingQuotes(response.output_text.trim());
+  return stripWrappingQuotes(response.text.trim());
 }

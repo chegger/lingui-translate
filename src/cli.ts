@@ -4,7 +4,7 @@ import { Command } from "commander";
 
 import { resolveConfig } from "./config.js";
 import { runTranslation } from "./run.js";
-import type { ConfigInput } from "./types.js";
+import type { AiProvider, ConfigInput } from "./types.js";
 
 async function main(): Promise<void> {
   const program = new Command();
@@ -16,8 +16,9 @@ async function main(): Promise<void> {
     .option("--locales-dir <path>", "Path to the locales directory")
     .option("--dry-run", "Show what would be translated without modifying files")
     .option("--languages <codes...>", "Specific language codes to process")
-    .option("--api-key <key>", "OpenAI API key")
-    .option("--base-url <url>", "Override the OpenAI base URL")
+    .option("--provider <name>", "AI provider to use: openai, anthropic, google")
+    .option("--api-key <key>", "Provider API key")
+    .option("--base-url <url>", "Override the provider base URL")
     .option("--workers <count>", "Number of parallel translation workers", parseInteger)
     .option("--model <name>", "LLM model to use")
     .option("--system-prompt <text>", "System prompt passed to the model");
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
     localesDir?: string;
     dryRun?: boolean;
     languages?: string[];
+    provider?: AiProvider;
     apiKey?: string;
     baseUrl?: string;
     workers?: number;
@@ -39,6 +41,7 @@ async function main(): Promise<void> {
     localesDir: options.localesDir,
     dryRun: options.dryRun,
     languages: options.languages,
+    provider: options.provider,
     apiKey: options.apiKey,
     baseUrl: options.baseUrl,
     workers: options.workers,
