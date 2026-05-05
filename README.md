@@ -126,6 +126,5 @@ There is no default API key or base URL. The API key must be provided through a 
 
 ## Exit codes
 
-- `0`: success, no files changed
-- `1`: fatal CLI error
-- `2`: translations were written to disk
+- `0`: success, whether or not translations were written
+- `1`: any CLI or translation error

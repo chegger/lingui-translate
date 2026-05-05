@@ -54,10 +54,7 @@ async function main(): Promise<void> {
     cliConfig,
   });
 
-  const stats = await runTranslation(config);
-  if (!config.dryRun && stats.translatedEntries > 0) {
-    process.exitCode = 2;
-  }
+  await runTranslation(config);
 }
 
 function parseInteger(value: string): number {

@@ -16,6 +16,16 @@ interface WorkItem {
   sampleTranslations: TranslationSample[];
 }
 
+interface TranslationBatchResult {
+  translatedCount: number;
+  hadErrors: boolean;
+}
+
+interface ProcessLanguageResult {
+  stats: LocaleStats;
+  hadErrors: boolean;
+}
+
 function getApiKeyHint(provider: AiProvider): string {
   switch (provider) {
     case "openai":
@@ -56,9 +66,12 @@ async function translateMissingEntries(
   workItems: WorkItem[],
   languageCode: string,
   config: ResolvedConfig,
-): Promise<number> {
+): Promise<TranslationBatchResult> {
   if (workItems.length === 0) {
-    return 0;
+    return {
+      translatedCount: 0,
+      hadErrors: false,
+    };
   }
 
   if (!config.apiKey) {
@@ -70,6 +83,7 @@ async function translateMissingEntries(
   const limit = pLimit(Math.max(1, Math.min(config.workers, workItems.length)));
   let translatedCount = 0;
   let completedCount = 0;
+  let hadErrors = false;
 
   console.log(`Translating ${workItems.length} missing entries for language: ${languageCode}`);
   console.log(`  Running translations in parallel with ${Math.max(1, Math.min(config.workers, workItems.length))} workers...`);
@@ -95,16 +109,18 @@ async function translateMissingEntries(
           console.log(`    Completed ${completedCount}/${workItems.length}`);
           return {
             ...workItem,
+            ok: true as const,
             translation,
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error(`    Error translating entry: ${message}`);
           completedCount += 1;
+          hadErrors = true;
           console.log(`    Completed ${completedCount}/${workItems.length}`);
           return {
             ...workItem,
-            translation: workItem.item.msgid,
+            ok: false as const,
           };
         }
       }),
@@ -112,17 +128,24 @@ async function translateMissingEntries(
   );
 
   for (const result of results.sort((left, right) => left.index - right.index)) {
+    if (!result.ok) {
+      continue;
+    }
+
     setItemTranslation(result.item, result.translation);
     translatedCount += 1;
   }
 
-  return translatedCount;
+  return {
+    translatedCount,
+    hadErrors,
+  };
 }
 
 async function processLanguageDirectory(
   languageDir: string,
   config: ResolvedConfig,
-): Promise<LocaleStats> {
+): Promise<ProcessLanguageResult> {
   const languageCode = getLanguageCode(languageDir);
   const poFilePath = path.join(languageDir, "messages.po");
   const po = await loadPoFile(poFilePath);
@@ -143,7 +166,10 @@ async function processLanguageDirectory(
 
   if (result.missingEntries === 0) {
     console.log("No missing translations found.");
-    return result;
+    return {
+      stats: result,
+      hadErrors: false,
+    };
   }
 
   if (config.dryRun) {
@@ -154,7 +180,10 @@ async function processLanguageDirectory(
     if (missingItems.length > 5) {
       console.log(`  ... and ${missingItems.length - 5} more entries`);
     }
-    return result;
+    return {
+      stats: result,
+      hadErrors: false,
+    };
   }
 
   console.log("  Analyzing existing translations to find relevant examples...");
@@ -165,7 +194,8 @@ async function processLanguageDirectory(
     sampleTranslations: getRelevantSampleTranslations(po, item, 10),
   }));
 
-  result.translatedEntries = await translateMissingEntries(workItems, languageCode, config);
+  const translationResult = await translateMissingEntries(workItems, languageCode, config);
+  result.translatedEntries = translationResult.translatedCount;
 
   if (result.translatedEntries > 0) {
     await savePoFile(po, poFilePath);
@@ -173,7 +203,10 @@ async function processLanguageDirectory(
     console.log(`Successfully translated ${result.translatedEntries} entries.`);
   }
 
-  return result;
+  return {
+    stats: result,
+    hadErrors: translationResult.hadErrors,
+  };
 }
 
 export async function runTranslation(config: ResolvedConfig): Promise<RunStats> {
@@ -202,19 +235,27 @@ export async function runTranslation(config: ResolvedConfig): Promise<RunStats> 
   console.log(`Found ${languageDirs.length} language directories: ${languageDirs.map(getLanguageCode).join(", ")}`);
 
   const totalStats = buildEmptyStats();
+  let hadErrors = false;
 
   for (const languageDir of languageDirs) {
     try {
       const result = await processLanguageDirectory(languageDir, config);
-      totalStats.totalEntries += result.totalEntries;
-      totalStats.missingEntries += result.missingEntries;
-      totalStats.translatedEntries += result.translatedEntries;
+      totalStats.totalEntries += result.stats.totalEntries;
+      totalStats.missingEntries += result.stats.missingEntries;
+      totalStats.translatedEntries += result.stats.translatedEntries;
+      hadErrors ||= result.hadErrors;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Error processing ${languageDir}: ${message}`);
+      hadErrors = true;
     }
   }
 
   printSummary(totalStats, config.dryRun);
+
+  if (hadErrors) {
+    throw new Error("Translation completed with errors.");
+  }
+
   return totalStats;
 }
