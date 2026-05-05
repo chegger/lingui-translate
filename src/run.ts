@@ -59,6 +59,7 @@ async function translateMissingEntries(
   const limit = pLimit(Math.max(1, Math.min(config.workers, workItems.length)));
   const client = createOpenAIClient(config);
   let translatedCount = 0;
+  let completedCount = 0;
 
   console.log(`Translating ${workItems.length} missing entries for language: ${languageCode}`);
   console.log(`  Running translations in parallel with ${Math.max(1, Math.min(config.workers, workItems.length))} workers...`);
@@ -66,6 +67,11 @@ async function translateMissingEntries(
   const results = await Promise.all(
     workItems.map((workItem) =>
       limit(async () => {
+        console.log(`  [${workItem.index}/${workItems.length}] Translating: ${workItem.item.msgid.slice(0, 50)}...`);
+        if (workItem.sampleTranslations.length > 0) {
+          console.log(`    Found ${workItem.sampleTranslations.length} relevant examples for context`);
+        }
+
         try {
           const translation = await translateText(client, config, {
             text: workItem.item.msgid,
@@ -74,6 +80,9 @@ async function translateMissingEntries(
             sampleTranslations: workItem.sampleTranslations,
           });
 
+          completedCount += 1;
+          console.log(`    -> ${translation.slice(0, 50)}...`);
+          console.log(`    Completed ${completedCount}/${workItems.length}`);
           return {
             ...workItem,
             translation,
@@ -81,6 +90,8 @@ async function translateMissingEntries(
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error(`    Error translating entry: ${message}`);
+          completedCount += 1;
+          console.log(`    Completed ${completedCount}/${workItems.length}`);
           return {
             ...workItem,
             translation: workItem.item.msgid,
@@ -91,13 +102,8 @@ async function translateMissingEntries(
   );
 
   for (const result of results.sort((left, right) => left.index - right.index)) {
-    console.log(`  [${result.index}/${workItems.length}] Translating: ${result.item.msgid.slice(0, 50)}...`);
-    if (result.sampleTranslations.length > 0) {
-      console.log(`    Found ${result.sampleTranslations.length} relevant examples for context`);
-    }
     setItemTranslation(result.item, result.translation);
     translatedCount += 1;
-    console.log(`    -> ${result.translation.slice(0, 50)}...`);
   }
 
   return translatedCount;
