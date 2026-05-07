@@ -25,7 +25,12 @@
     "openai",
     "po"
   ],
+  "homepage": "https://github.com/chegger/lingui-translate#readme",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chegger/lingui-translate.git"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
