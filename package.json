@@ -1,6 +1,6 @@
 {
   "name": "lingui-translate",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "CLI for translating missing Lingui PO entries with an LLM.",
   "type": "module",
   "bin": {
