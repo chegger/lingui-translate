@@ -103,7 +103,6 @@ export async function translateText(
     system: config.systemPrompt,
     prompt,
     maxOutputTokens: 1000,
-    temperature: 0.3,
   });
 
   return stripWrappingQuotes(response.text.trim());
